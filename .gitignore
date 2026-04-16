@@ -1,0 +1,21 @@
+# Environment
+.venv
+.env
+
+# OS / IDE
+.DS_Store
+
+
+# Python
+__pycache__/
+**__pycache__**
+*.pyc
+
+# Data & outputs
+data/
+artifacts/
+*.npy
+*.zip
+*.png
+*.pdf
+*.pkl

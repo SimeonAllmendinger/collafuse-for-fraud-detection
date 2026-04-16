@@ -1,0 +1,17 @@
+extends: config_collafuse.yaml
+
+paths:
+  raw_main_path: data/raw/baf/Base.csv
+  prepared_root: artifacts/baf/prepared
+  stage1_root: artifacts/baf/stage1
+  stage2_root: artifacts/baf/stage2
+  run_all_stages_root: artifacts/baf/run_all_stages
+
+data:
+  dataset_name: baf
+  transaction_id_column: baf_record_id
+  label_column: fraud_bool
+
+client_split:
+  strategy: quantile
+  source_column: month

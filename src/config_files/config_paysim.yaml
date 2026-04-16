@@ -1,0 +1,26 @@
+extends: config_collafuse.yaml
+
+paths:
+  raw_main_path: data/raw/paysim/paysim.csv
+  prepared_root: artifacts/paysim/prepared
+  stage1_root: artifacts/paysim/stage1
+  stage2_root: artifacts/paysim/stage2
+  run_all_stages_root: artifacts/paysim/run_all_stages
+
+data:
+  dataset_name: paysim
+  transaction_id_column: paysim_transaction_id
+  label_column: isFraud
+  drop_columns:
+    - nameOrig
+    - nameDest
+
+client_split:
+  strategy: categorical
+  source_column: type
+  categorical_values:
+    - CASH_IN
+    - CASH_OUT
+    - DEBIT
+    - PAYMENT
+    - TRANSFER

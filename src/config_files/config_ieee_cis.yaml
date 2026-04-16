@@ -1,0 +1,39 @@
+extends: config_collafuse.yaml
+
+paths:
+  raw_transaction_path: data/raw/ieee_cis/train_transaction.csv
+  raw_identity_path: data/raw/ieee_cis/train_identity.csv
+  prepared_root: artifacts/ieee_cis/prepared
+  stage1_root: artifacts/ieee_cis/stage1
+  stage2_root: artifacts/ieee_cis/stage2
+  run_all_stages_root: artifacts/ieee_cis/run_all_stages
+
+data:
+  dataset_name: ieee_cis
+  transaction_id_column: TransactionID
+  label_column: isFraud
+
+client_split:
+  strategy: card_rules
+  card4_column: card4
+  card6_column: card6
+  rules:
+    - client_id: CLIENT_0
+      label: other
+      fallback: true
+    - client_id: CLIENT_1
+      label: mastercard_credit
+      card4: mastercard
+      card6: credit
+    - client_id: CLIENT_2
+      label: visa_debit
+      card4: visa
+      card6: debit
+    - client_id: CLIENT_3
+      label: mastercard_debit
+      card4: mastercard
+      card6: debit
+    - client_id: CLIENT_4
+      label: visa_credit
+      card4: visa
+      card6: credit

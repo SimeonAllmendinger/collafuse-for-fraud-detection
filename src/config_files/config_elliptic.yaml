@@ -1,0 +1,19 @@
+extends: config_collafuse.yaml
+
+paths:
+  raw_main_path: data/raw/elliptic/elliptic_txs_features.csv
+  raw_aux_path: data/raw/elliptic/elliptic_txs_classes.csv
+  raw_edge_path: data/raw/elliptic/elliptic_txs_edgelist.csv
+  prepared_root: artifacts/elliptic/prepared
+  stage1_root: artifacts/elliptic/stage1
+  stage2_root: artifacts/elliptic/stage2
+  run_all_stages_root: artifacts/elliptic/run_all_stages
+
+data:
+  dataset_name: elliptic
+  transaction_id_column: txId
+  label_column: class
+
+client_split:
+  strategy: quantile
+  source_column: time_step
