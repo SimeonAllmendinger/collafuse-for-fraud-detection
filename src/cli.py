@@ -7,7 +7,7 @@ from src.config_files.config import load_pipeline_config
 from src.pipeline.prepare import run_preparation
 from src.pipeline.run_all_stages import run_all_stages_pipeline
 from src.pipeline.stage1 import run_stage1_generation
-from src.pipeline.stage2 import run_stage2_evaluation
+from src.pipeline.stage2 import rerun_stage2_visualizations, run_stage2_evaluation
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,6 +42,15 @@ def build_parser() -> argparse.ArgumentParser:
     stage2_parser.add_argument(
         "--stage1-run",
         help="Stage 1 run id or absolute path; defaults to the latest Stage 1 run"
+    )
+
+    stage2_visualize_parser = subparsers.add_parser(
+        "stage2-visualize",
+        help="Re-render the final Stage 2 plots for an existing Stage 2 run"
+    )
+    stage2_visualize_parser.add_argument(
+        "--stage2-run",
+        help="Stage 2 run id or absolute path; defaults to the latest Stage 2 run"
     )
 
     run_parser = subparsers.add_parser(
@@ -80,6 +89,9 @@ def main() -> None:
         print(run_dir)
     elif args.command == "stage2-evaluate":
         run_dir = run_stage2_evaluation(config, stage1_run=args.stage1_run)
+        print(run_dir)
+    elif args.command == "stage2-visualize":
+        run_dir = rerun_stage2_visualizations(config, stage2_run=args.stage2_run)
         print(run_dir)
     elif args.command == "run-all-stages":
         run_all_stages_dir = run_all_stages_pipeline(config, reuse_checkpoint=args.reuse_checkpoint)

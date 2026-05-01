@@ -13,7 +13,7 @@ class DDPM(nn.Module):
         self.device = device
         self.class_embedding = nn.Embedding(num_classes, class_emb_dim)
         self.beta_schedule = BetaSchedule(T=T, beta_start=beta_start, beta_end=beta_end, device=device)
-        self.noise_predictor = NoisePredictor(input_dim, time_embed_dim)
+        self.noise_predictor = NoisePredictor(input_dim, time_embed_dim, class_emb_dim=class_emb_dim)
         self.time_embed_dim = time_embed_dim
 
     def forward_diffusion(self, x_0):
@@ -73,6 +73,16 @@ class DDPM(nn.Module):
         if num_of_inference_steps is None:
             num_of_inference_steps = self.T
         x_t = torch.randn(shape).to(device) #Starting denoising from pure noise.
+
+        if class_label is not None:
+            if isinstance(class_label, int):
+                class_label = torch.full((shape[0],), int(class_label), device=device, dtype=torch.long)
+            else:
+                class_label = torch.as_tensor(class_label, device=device, dtype=torch.long)
+                if class_label.ndim == 0:
+                    class_label = class_label.repeat(shape[0])
+                elif class_label.shape[0] != shape[0]:
+                    raise ValueError("class_label must be a scalar or have one value per sample")
         
         for t_idx in reversed(range(num_of_inference_steps)):  # Reverse diffusion
             t = torch.full((shape[0],), t_idx, device=device, dtype=torch.long)

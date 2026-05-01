@@ -1,0 +1,25 @@
+name: collafuse-fraud
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pytorch
+  - pytorch-cuda
+  - scikit-learn
+  - matplotlib
+  - pandas
+  - numpy
+  - scipy
+  - pip
+  - lightgbm
+  - pip:
+    - imbalanced-learn>=0.12,<0.15
+    - pyyaml
+    - pydantic
+    - tqdm
+    - joblib
+    - ctgan
+    - scienceplots
+    - lightgbm

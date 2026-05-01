@@ -25,9 +25,10 @@ from src.collafuse.visualization import (
     plot_source_embedding,
 )
 from src.config_files.configs import PaperPipelineConfig
-from src.pipeline.common import ensure_directory, make_run_id, read_json, write_json
+from src.pipeline.common import ensure_directory, make_run_id, read_json, serialize_config, write_json
 
 LOGGER = logging.getLogger("collafuse")
+GLOBAL_MMD_CLIENT_ID = "GLOBAL"
 
 
 def _attach_embedding_metadata(sample: pd.DataFrame, client_id: str, synthetic_source: str) -> pd.DataFrame:
@@ -70,6 +71,8 @@ def run_stage1_generation(config: PaperPipelineConfig, reuse_checkpoint: bool = 
     feature_columns = prepared_metadata["feature_columns"]
     mmd_rows: list[dict[str, Any]] = []
     embedding_frames: list[pd.DataFrame] = []
+    global_real_frames: list[pd.DataFrame] = []
+    global_source_frames: dict[str, list[pd.DataFrame]] = {}
 
     LOGGER.info("Phase 4/4: build RQ1 artifacts and baseline samples")
     enabled_rq1_sources = set(get_enabled_rq1_sources(config))
@@ -78,6 +81,7 @@ def run_stage1_generation(config: PaperPipelineConfig, reuse_checkpoint: bool = 
         LOGGER.info("Preparing RQ1 artifacts for %s", client_id)
         train_frame = pd.read_csv(client_entry["train_path"])
         real_fraud = train_frame.loc[train_frame[label_column] == 1].reset_index(drop=True)
+        global_real_frames.append(real_fraud[feature_columns])
         collafuse_frame = pd.read_csv(synthetic_paths["collafuse"][client_id])
         target_count = len(collafuse_frame)
         source_frames: dict[str, pd.DataFrame] = {}
@@ -114,6 +118,7 @@ def run_stage1_generation(config: PaperPipelineConfig, reuse_checkpoint: bool = 
             )
 
         for source_name, source_frame in source_frames.items():
+            global_source_frames.setdefault(source_name, []).append(source_frame[feature_columns])
             mmd_rows.extend(
                 compute_mmd_rows(
                     real_samples=real_fraud[feature_columns].to_numpy(),
@@ -122,6 +127,7 @@ def run_stage1_generation(config: PaperPipelineConfig, reuse_checkpoint: bool = 
                     batch_size=config.evaluation.mmd_batch_size,
                     source=source_name,
                     client_id=client_id,
+                    comparison_scope="client",
                 )
             )
             sample_size = min(300, len(source_frame))
@@ -144,11 +150,27 @@ def run_stage1_generation(config: PaperPipelineConfig, reuse_checkpoint: bool = 
             real_sample = _attach_embedding_metadata(real_sample, client_id=client_id, synthetic_source="real_fraud")
             embedding_frames.append(real_sample)
 
+    global_real_frame = pd.concat(global_real_frames, ignore_index=True) if global_real_frames else pd.DataFrame()
+    if not global_real_frame.empty:
+        for source_name, source_feature_frames in global_source_frames.items():
+            global_source_frame = pd.concat(source_feature_frames, ignore_index=True)
+            mmd_rows.extend(
+                compute_mmd_rows(
+                    real_samples=global_real_frame.to_numpy(),
+                    generated_samples=global_source_frame.to_numpy(),
+                    seeds=config.evaluation.mmd_seeds,
+                    batch_size=config.evaluation.mmd_batch_size,
+                    source=source_name,
+                    client_id=GLOBAL_MMD_CLIENT_ID,
+                    comparison_scope="global",
+                )
+            )
+
     mmd_frame = pd.DataFrame(mmd_rows)
     mmd_raw_path = run_dir / "rq1_mmd_raw.csv"
     mmd_frame.to_csv(mmd_raw_path, index=False)
     mmd_summary = (
-        mmd_frame.groupby(["synthetic_source", "client_id"], dropna=False)["mmd"]
+        mmd_frame.groupby(["comparison_scope", "synthetic_source", "client_id"], dropna=False)["mmd"]
         .agg(["mean", "std"])
         .reset_index()
         .rename(columns={"mean": "mmd_mean", "std": "mmd_std"})
@@ -173,16 +195,25 @@ def run_stage1_generation(config: PaperPipelineConfig, reuse_checkpoint: bool = 
         embedded_path = run_dir / "rq1_embedding.csv"
         pd.DataFrame().to_csv(embedded_path, index=False)
 
-    plot_mmd_boxplot(mmd_frame, run_dir / "rq1_mmd_boxplot.png")
+    client_mmd_path = run_dir / "rq1_mmd_boxplot.png"
+    client_mmd_frame = mmd_frame.loc[mmd_frame["comparison_scope"] == "client"]
+    plot_mmd_boxplot(client_mmd_frame, client_mmd_path, title="RQ1 Client Distributional Fidelity")
+
+    global_mmd_path = run_dir / "rq1_mmd_global_boxplot.png"
+    global_mmd_frame = mmd_frame.loc[mmd_frame["comparison_scope"] == "global"]
+    plot_mmd_boxplot(global_mmd_frame, global_mmd_path, title="RQ1 Global Distributional Fidelity")
 
     manifest = {
         "run_id": run_id,
+        "config": serialize_config(config),
         "prepared_root": str(config.paths.prepared_root),
         "checkpoint_path": str(checkpoint_path),
         "synthetic_paths": synthetic_paths,
         "baseline_model_paths": baseline_model_paths,
         "rq1_mmd_raw_path": str(mmd_raw_path),
         "rq1_mmd_summary_path": str(mmd_summary_path),
+        "rq1_mmd_boxplot_path": str(client_mmd_path),
+        "rq1_mmd_global_boxplot_path": str(global_mmd_path),
         "rq1_embedding_path": str(embedded_path),
         "training_history_path": str(run_dir / "training_history.csv"),
         "collafuse_training_loss_plot_path": str(collafuse_training_loss_path),

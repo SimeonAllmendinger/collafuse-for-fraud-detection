@@ -13,7 +13,7 @@ from src.collafuse.preprocessing import (
 from src.collafuse.visualization import plot_preparation_client_overview
 from src.config_files.configs import PaperPipelineConfig
 from src.pipeline.datasets import load_preparation_dataset
-from src.pipeline.common import ensure_directory, write_json
+from src.pipeline.common import ensure_directory, read_json, write_json
 
 LOGGER = logging.getLogger("collafuse")
 
@@ -27,6 +27,25 @@ def _client_is_viable(train_frame, test_frame, label_column: str) -> bool:
     )
 
 
+def _existing_prepared_data_is_usable(prepared_root: Path) -> bool:
+    metadata_path = prepared_root / "metadata.json"
+    if not metadata_path.exists():
+        return False
+
+    metadata = read_json(metadata_path)
+    client_entries = metadata.get("clients", [])
+    if not client_entries:
+        return False
+
+    for client_entry in client_entries:
+        train_path = Path(client_entry["train_path"])
+        test_path = Path(client_entry["test_path"])
+        if not train_path.exists() or not test_path.exists():
+            return False
+
+    return True
+
+
 def run_preparation(
     config: PaperPipelineConfig,
     raw_transaction_path: str | Path | None = None,
@@ -36,6 +55,10 @@ def run_preparation(
     raw_edge_path: str | Path | None = None,
 ) -> Path:
     prepared_root = ensure_directory(config.paths.prepared_root)
+    if config.data.use_prepared_if_exists and _existing_prepared_data_is_usable(prepared_root):
+        LOGGER.info("Reusing existing prepared data at %s", prepared_root)
+        return prepared_root
+
     clients_dir = ensure_directory(prepared_root / "clients")
 
     loaded_dataset = load_preparation_dataset(

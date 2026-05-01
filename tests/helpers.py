@@ -253,6 +253,10 @@ def build_test_config(base_dir: Path, dataset_name: TestDatasetName = "ieee_cis"
         classifiers=ClassifiersConfig(
             suite=[
                 ClassifierSpec(name="logistic_regression", params={"max_iter": 200}),
+                ClassifierSpec(
+                    name="fedavg_logistic_regression",
+                    params={"num_rounds": 2, "local_epochs": 1, "learning_rate": 0.05, "batch_size": 4},
+                ),
                 ClassifierSpec(name="random_forest", params={"n_estimators": 10, "min_samples_leaf": 1}),
                 ClassifierSpec(name="hist_gradient_boosting", params={"max_iter": 20, "max_depth": 3}),
             ]

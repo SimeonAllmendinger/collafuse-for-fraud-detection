@@ -1,0 +1,22 @@
+# Core numerical and ML stack
+numpy
+pandas
+scipy
+scikit-learn
+imbalanced-learn
+
+# Pipeline and config
+PyYAML
+pydantic
+tqdm
+joblib
+
+# Plotting
+matplotlib
+SciencePlots
+
+# Generative baselines
+ctgan
+
+# Deep learning
+torch

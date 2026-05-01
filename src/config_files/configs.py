@@ -33,8 +33,10 @@ def default_client_rules() -> list["ClientRule"]:
 def default_classifier_specs() -> list["ClassifierSpec"]:
     return [
         ClassifierSpec(name="logistic_regression"),
+        ClassifierSpec(name="fedavg_logistic_regression"),
         ClassifierSpec(name="random_forest"),
         ClassifierSpec(name="hist_gradient_boosting"),
+        ClassifierSpec(name="lightgbm"),
     ]
 
 
@@ -73,6 +75,7 @@ class DataConfig(BaseModel):
     dataset_name: DatasetName = "ieee_cis"
     transaction_id_column: str = "TransactionID"
     label_column: str = "isFraud"
+    use_prepared_if_exists: bool = False
     fill_strategy: Literal["mean", "median", "zero"] = "median"
     test_size: float = 0.15
     correlation_threshold: float = 0.95
@@ -240,7 +243,7 @@ class BaselinesConfig(BaseModel):
 class ClassifierSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal["logistic_regression", "random_forest", "hist_gradient_boosting"]
+    name: Literal["logistic_regression", "fedavg_logistic_regression", "random_forest", "hist_gradient_boosting", "lightgbm"]
     params: dict[str, Any] = Field(default_factory=dict)
 
 

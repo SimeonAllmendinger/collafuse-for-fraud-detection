@@ -70,6 +70,17 @@ class CollaFuseExperiment:
             num_training_steps=total_steps,
         )
 
+    def _conditioning_embedding(self, model: DDPM, labels: torch.Tensor) -> torch.Tensor:
+        return model.class_embedding(labels.long())
+
+    def _target_labels(self, batch_size: int) -> torch.Tensor:
+        return torch.full(
+            (batch_size,),
+            int(self.config.sampling.target_label),
+            device=self.device,
+            dtype=torch.long,
+        )
+
     def _build_clients(self, client_entries: list[dict[str, Any]]) -> dict[str, ClientRuntime]:
         clients: dict[str, ClientRuntime] = {}
         total_steps = 0
@@ -152,7 +163,8 @@ class CollaFuseExperiment:
         x_t = client.nonfraud_mean + client.nonfraud_std * z
         zero_steps = torch.zeros((triplet_batch_size,), dtype=torch.long, device=self.device)
         t_emb = get_sinusoidal_embedding(zero_steps, embedding_dim=self.config.collafuse.time_embed_dim).to(self.device)
-        noise_prediction = client.model.noise_predictor(x_t, t_emb)
+        target_cond = self._conditioning_embedding(client.model, self._target_labels(triplet_batch_size))
+        noise_prediction = client.model.noise_predictor(x_t, t_emb, target_cond)
         sqrt_alpha_bar_0 = client.model.beta_schedule.sqrt_alpha_bars[0]
         one_minus_alpha_bar_0 = client.model.beta_schedule.one_minus_alpha_bars[0]
         anchor = (x_t - one_minus_alpha_bar_0 * noise_prediction) / sqrt_alpha_bar_0
@@ -176,8 +188,9 @@ class CollaFuseExperiment:
             desc=f"Epoch {epoch}/{self.config.collafuse.epochs} {client.client_id}",
             leave=False,
         ) as batch_progress:
-            for batch_features, _ in client.dataloader:
+            for batch_features, batch_labels in client.dataloader:
                 x_0 = batch_features.to(self.device)
+                labels = batch_labels.to(self.device, dtype=torch.long)
                 batch_size = x_0.shape[0]
                 client_noise = torch.randn_like(x_0)
                 anchor, positive, negative = self._sample_triplets(client, batch_size)
@@ -194,7 +207,8 @@ class CollaFuseExperiment:
                         client_timesteps,
                         embedding_dim=self.config.collafuse.time_embed_dim
                     ).to(self.device)
-                    predicted_noise = client.model.noise_predictor(x_t, t_emb)
+                    client_cond = self._conditioning_embedding(client.model, labels)
+                    predicted_noise = client.model.noise_predictor(x_t, t_emb, client_cond)
                     loss, components = fraud_diffuse_loss(
                         predicted_noise=predicted_noise,
                         true_noise=client_noise,
@@ -243,7 +257,8 @@ class CollaFuseExperiment:
                         cloud_timesteps,
                         embedding_dim=self.config.collafuse.time_embed_dim
                     ).to(self.device)
-                    cloud_prediction = self.cloud_model.noise_predictor(x_cloud, t_emb)
+                    cloud_cond = self._conditioning_embedding(self.cloud_model, labels)
+                    cloud_prediction = self.cloud_model.noise_predictor(x_cloud, t_emb, cloud_cond)
                     cloud_loss = F.mse_loss(cloud_prediction, cloud_noise)
                     self.cloud_optimizer.zero_grad()
                     cloud_loss.backward()
@@ -355,6 +370,7 @@ class CollaFuseExperiment:
             for start in batch_starts:
                 current_batch_size = min(sample_batch_size, n_samples - start)
                 x_t = torch.randn((current_batch_size, len(self.feature_columns)), device=self.device)
+                target_labels = self._target_labels(current_batch_size)
                 for t_idx in reversed(range(total_steps)):
                     timesteps = torch.full((current_batch_size,), t_idx, device=self.device, dtype=torch.long)
                     t_emb = get_sinusoidal_embedding(
@@ -362,9 +378,11 @@ class CollaFuseExperiment:
                         embedding_dim=self.config.collafuse.time_embed_dim
                     ).to(self.device)
                     if t_idx >= self.cut_timestep:
-                        x_t = self.cloud_model.p_sample(x_t, timesteps, t_emb)
+                        cond = self._conditioning_embedding(self.cloud_model, target_labels)
+                        x_t = self.cloud_model.p_sample(x_t, timesteps, t_emb, cond=cond)
                     else:
-                        x_t = client.model.p_sample(x_t, timesteps, t_emb)
+                        cond = self._conditioning_embedding(client.model, target_labels)
+                        x_t = client.model.p_sample(x_t, timesteps, t_emb, cond=cond)
                     progress.update(1)
                 outputs.append(x_t.detach().cpu())
         frame = pd.DataFrame(torch.cat(outputs, dim=0).numpy(), columns=self.feature_columns)

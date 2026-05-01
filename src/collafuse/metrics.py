@@ -69,6 +69,7 @@ def compute_mmd_rows(
     batch_size: int,
     source: str,
     client_id: str,
+    comparison_scope: str = "client",
 ) -> list[dict[str, Any]]:
     if len(real_samples) == 0 or len(generated_samples) == 0:
         return []
@@ -91,6 +92,7 @@ def compute_mmd_rows(
         )
         rows.append(
             {
+                "comparison_scope": comparison_scope,
                 "client_id": client_id,
                 "synthetic_source": source,
                 "seed": seed,

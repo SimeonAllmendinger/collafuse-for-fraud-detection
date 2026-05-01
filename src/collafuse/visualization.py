@@ -44,7 +44,7 @@ SOURCE_DISPLAY_NAMES = {
     "random_oversampling": "Random Oversampling",
     "smote": "SMOTE",
     "adasyn": "ADASYN",
-    "collafuse": "CollaFuse",
+    "collafuse": "Our Approach",
     "ctgan": "CTGAN",
     "tabddpm": "TabDDPM",
     "local_only_ddpm": "Local Only DDPM",
@@ -243,7 +243,7 @@ def plot_source_embedding(embedding_frame: pd.DataFrame, output_path: str | Path
     ensure_directory(output_path.parent)
 
     with _plot_style():
-        figure, axis = plt.subplots(figsize=(10.5, 7))
+        figure, axis = plt.subplots(figsize=(10, 10))
         source_values = embedding_frame["synthetic_source"].dropna().unique().tolist()
         for source in _ordered_sources(source_values):
             group = embedding_frame.loc[embedding_frame["synthetic_source"] == source]
@@ -257,20 +257,41 @@ def plot_source_embedding(embedding_frame: pd.DataFrame, output_path: str | Path
                 marker=SOURCE_MARKERS.get(source, "o"),
                 edgecolors="none",
             )
-        axis.set_title("PCA + t-SNE Fraud Embedding", loc="left", pad=10)
         axis.set_xlabel("t-SNE 1")
         axis.set_ylabel("t-SNE 2")
         axis.grid(alpha=0.18, linewidth=0.7)
-        axis.legend(frameon=False, ncol=2, fontsize=9)
-        figure.tight_layout()
+        axis.xaxis.label.set_size(16)
+        axis.yaxis.label.set_size(16)
+        axis.tick_params(axis="both", labelsize=16)
+        legend = axis.legend(
+            frameon=False,
+            ncol=2,
+            fontsize=16,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 1.02),
+            markerscale=1.8,
+        )
+        if legend is not None:
+            for text in legend.get_texts():
+                text.set_fontsize(16)
+        figure.tight_layout(rect=(0.0, 0.0, 1.0, 0.9))
         figure.savefig(output_path, dpi=220)
         plt.close(figure)
     return output_path
 
 
-def plot_mmd_boxplot(mmd_frame: pd.DataFrame, output_path: str | Path) -> Path:
+def plot_mmd_boxplot(mmd_frame: pd.DataFrame, output_path: str | Path, title: str = "RQ1 Distributional Fidelity") -> Path:
     output_path = Path(output_path)
     ensure_directory(output_path.parent)
+    if mmd_frame.empty:
+        with _plot_style():
+            figure, axis = plt.subplots(figsize=(10.5, 5.5))
+            axis.text(0.5, 0.5, "No MMD data available", ha="center", va="center")
+            axis.axis("off")
+            figure.tight_layout()
+            figure.savefig(output_path, dpi=220)
+            plt.close(figure)
+        return output_path
 
     ordered_sources = _ordered_sources(mmd_frame["synthetic_source"].dropna().unique().tolist())
     values = [mmd_frame.loc[mmd_frame["synthetic_source"] == source, "mmd"].to_list() for source in ordered_sources]
@@ -290,7 +311,7 @@ def plot_mmd_boxplot(mmd_frame: pd.DataFrame, output_path: str | Path) -> Path:
             patch.set_edgecolor(color)
             patch.set_alpha(0.86)
 
-        axis.set_title("RQ1 Distributional Fidelity", loc="left", pad=10)
+        axis.set_title(title, loc="left", pad=10)
         axis.set_ylabel("MMD")
         axis.grid(axis="y", alpha=0.18, linewidth=0.7)
         axis.tick_params(axis="x", rotation=20)

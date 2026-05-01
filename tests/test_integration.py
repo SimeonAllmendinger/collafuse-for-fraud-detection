@@ -30,6 +30,8 @@ class IntegrationTest(unittest.TestCase):
             stage1_manifest = read_json(stage1_dir / "run_manifest.json")
             self.assertTrue(Path(stage1_manifest["checkpoint_path"]).exists())
             self.assertTrue(Path(stage1_manifest["rq1_mmd_summary_path"]).exists())
+            self.assertTrue(Path(stage1_manifest["rq1_mmd_boxplot_path"]).exists())
+            self.assertTrue(Path(stage1_manifest["rq1_mmd_global_boxplot_path"]).exists())
             self.assertIn("collafuse", stage1_manifest["synthetic_paths"])
             for source_paths in stage1_manifest["synthetic_paths"].values():
                 for synthetic_path in source_paths.values():
@@ -39,6 +41,7 @@ class IntegrationTest(unittest.TestCase):
             stage2_manifest = read_json(stage2_dir / "run_manifest.json")
             self.assertTrue(Path(stage2_manifest["metrics_raw_path"]).exists())
             self.assertTrue(Path(stage2_manifest["metrics_summary_path"]).exists())
+            self.assertIn("fedavg_logistic_regression", Path(stage2_manifest["metrics_summary_path"]).read_text(encoding="utf-8"))
 
     def test_run_all_stages_writes_manifest(self) -> None:
         from src.pipeline.run_all_stages import run_all_stages_pipeline

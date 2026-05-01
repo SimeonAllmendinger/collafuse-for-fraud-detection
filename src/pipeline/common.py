@@ -27,6 +27,12 @@ def write_json(path: str | Path, payload: dict[str, Any]) -> Path:
     return output_path
 
 
+def serialize_config(config: Any) -> dict[str, Any]:
+    if hasattr(config, "model_dump"):
+        return config.model_dump(mode="json")
+    raise TypeError("Config object does not support model_dump(mode='json')")
+
+
 def read_json(path: str | Path) -> dict[str, Any]:
     with Path(path).open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -79,4 +85,27 @@ def resolve_stage1_run(stage1_root: Path, stage1_run: str | None = None) -> Path
     )
     if not candidates:
         raise ValueError(f"No Stage 1 runs were found under: {stage1_root}")
+    return candidates[-1].resolve()
+
+
+def resolve_stage2_run(stage2_root: Path, stage2_run: str | None = None) -> Path:
+    stage2_root = Path(stage2_root)
+
+    if stage2_run:
+        candidate = Path(stage2_run)
+        resolved = candidate.resolve() if candidate.exists() else (stage2_root / stage2_run).resolve()
+        if not resolved.exists():
+            raise ValueError(f"Stage 2 run does not exist: {stage2_run}")
+        if not (resolved / "run_manifest.json").exists():
+            raise ValueError(f"Stage 2 run is missing run_manifest.json: {resolved}")
+        return resolved
+
+    if not stage2_root.exists():
+        raise ValueError(f"Stage 2 root does not exist: {stage2_root}")
+
+    candidates = sorted(
+        path for path in stage2_root.iterdir() if path.is_dir() and (path / "run_manifest.json").exists()
+    )
+    if not candidates:
+        raise ValueError(f"No Stage 2 runs were found under: {stage2_root}")
     return candidates[-1].resolve()
